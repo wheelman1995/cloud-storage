@@ -72,21 +72,21 @@ class LocalPane {
         keyCombinationPaste = new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN);
         keyCombinationProps = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
         
-        MenuItem refresh = new MenuItem("Refresh");
-        MenuItem open = new MenuItem("Open");
-        MenuItem upload = new MenuItem("Upload");
-        MenuItem delete = new MenuItem("Delete");
-        MenuItem rename = new MenuItem("Rename");
-        MenuItem properties = new MenuItem("Properties");
+        MenuItem refresh = new MenuItem(   "Refresh (F5)");
+        MenuItem open = new MenuItem(      "Open (Enter)");
+        MenuItem upload = new MenuItem(    "Upload (U)");
+        MenuItem delete = new MenuItem(    "Delete (Del)");
+        MenuItem rename = new MenuItem(    "Rename (F2)");
+        MenuItem properties = new MenuItem("Properties (Alt + Enter)");
         
         contextMenuForFiles = new ContextMenu();
         contextMenuForFiles.getItems().addAll(refresh, open, upload, delete, rename, properties);
     
-        MenuItem refreshDir = new MenuItem("Refresh");
-        MenuItem openDir = new MenuItem("Open");
-        MenuItem deleteDir = new MenuItem("Delete");
-        MenuItem renameDir = new MenuItem("Rename");
-        MenuItem propertiesDir = new MenuItem("Properties");
+        MenuItem refreshDir = new MenuItem("Refresh (F5)");
+        MenuItem openDir = new MenuItem("Open (Enter)");
+        MenuItem deleteDir = new MenuItem("Delete (Del)");
+        MenuItem renameDir = new MenuItem("Rename (F2)");
+        MenuItem propertiesDir = new MenuItem("Properties (Alt + Enter)");
         
         contextMenuForDir = new ContextMenu();
         contextMenuForDir.getItems().addAll(refreshDir, openDir, deleteDir, renameDir, propertiesDir);
@@ -206,7 +206,6 @@ class LocalPane {
         });
         
         localListView.setOnKeyPressed(event -> {
-    
             if (keyCombinationCopy.match(event)) {
                 copy(false);
             } else if (keyCombinationCut.match(event)) {
@@ -243,6 +242,9 @@ class LocalPane {
                     case F2:
                         rename();
                         break;
+                    case U:
+                        upload();
+                        break;
                 }
             }
         });
@@ -271,33 +273,41 @@ class LocalPane {
     }
     
     private void upload() {
-        String fileName = getSelectedItemPath().getFileName().toString();
-        byte[] fileBytes = null;
-        try {
-            fileBytes = Files.readAllBytes(getSelectedItemPath());
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (!localListView.getSelectionModel().isEmpty() && Network.getInstance().isConnected()) {
+            if (!Files.isDirectory(getSelectedItemPath())) {
+                String fileName = getSelectedItemPath().getFileName().toString();
+                byte[] fileBytes = null;
+                try {
+                    fileBytes = Files.readAllBytes(getSelectedItemPath());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                dataHandler.write(new AbstractMessage(MessageType.FILE, fileName, fileBytes));
+            }
         }
-        dataHandler.write(new AbstractMessage(MessageType.FILE, fileName, fileBytes));
     }
     
     private void open() {
-        //if we tried to open a directory, open it in our list view
-        if(Files.isDirectory(getSelectedItemPath())) {
-            updateListView(getSelectedItemPath().toString());
-            //if we tried to open a file, open it with a default application
-        } else {
-            try {
-                Desktop.getDesktop().open(getSelectedItemPath().toFile());
-            } catch (IOException e) {
-                e.printStackTrace();
+        if (!localListView.getSelectionModel().isEmpty()) {
+            //if we tried to open a directory, open it in our list view
+            if(Files.isDirectory(getSelectedItemPath())) {
+                updateListView(getSelectedItemPath().toString());
+                //if we tried to open a file, open it with a default application
+            } else {
+                try {
+                    Desktop.getDesktop().open(getSelectedItemPath().toFile());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
     
     private void copy(boolean move) {
-        this.move = move;
-        if (!localListView.getSelectionModel().isEmpty()) srcPath = getSelectedItemPath();
+        if (!localListView.getSelectionModel().isEmpty()) {
+            this.move = move;
+            srcPath = getSelectedItemPath();
+        }
     }
     
     private void paste() {
@@ -440,57 +450,63 @@ class LocalPane {
     }
     
     private void delete() {
-        try {
-            doFileOperation(getSelectedItemPath(), null, OperationType.DELETE);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    
-    private void rename() {
-        Path p = getSelectedItemPath();
-        renameDialog.getEditor().setText(p.getFileName().toString());
-        renameDialog.showAndWait();
-        if(renameDialog.getResult() != null) {
-            String newName = renameDialog.getResult();
-            dstPath = Paths.get(currentPath + newName);
+        if (!localListView.getSelectionModel().isEmpty()) {
             try {
-                doFileOperation(p, dstPath, OperationType.RENAME);
+                doFileOperation(getSelectedItemPath(), null, OperationType.DELETE);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
     
-    private void getProperties() {
-        Path p = getSelectedItemPath();
-        try {
-            String name = p.getFileName().toString();
-            String location = p.toString();
-            doFileOperation(p, null, OperationType.GET_SIZE);
-            StringBuilder byteSize = new StringBuilder(Long.toString(size));
-            for (int i = byteSize.length() - 3; i > 0 ; i -= 3) {
-                byteSize.insert(i, ' ');
+    private void rename() {
+        if (!localListView.getSelectionModel().isEmpty()) {
+            Path p = getSelectedItemPath();
+            renameDialog.getEditor().setText(p.getFileName().toString());
+            renameDialog.showAndWait();
+            if(renameDialog.getResult() != null) {
+                String newName = renameDialog.getResult();
+                dstPath = Paths.get(currentPath + newName);
+                try {
+                    doFileOperation(p, dstPath, OperationType.RENAME);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-            String sizeStr = Long.toString(size) + " bytes";
-            if(size >= 1073741824L) sizeStr = String.format("%.2f", (float)size/1073741824L) + " Gb (" + byteSize + " bytes)";
-            else if(size >= 1048576L) sizeStr = String.format("%.2f", (float)size/1048576L) + " Mb (" + byteSize + " bytes)";
-            else if(size >= 1024L) sizeStr = String.format("%.2f", (float)size/1024L) + " Kb (" + byteSize + " bytes)";
-            StringBuilder contentText = new StringBuilder();
-            contentText.append("Name: ").append(name).append("\n").append("Location: ").append(location).append("\n").append("Size: ").append(sizeStr);
-            if (Files.isDirectory(p)) {
-                if (numberOfDirs < 0) numberOfDirs = 0;
-                contentText.append("\n" + "Contains: ").append(numberOfFiles).append(" files, ").append(numberOfDirs).append(" folders");
-            }
-            propAlert.setContentText(contentText.toString());
-            propAlert.setTitle(name + " properties");
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        propAlert.showAndWait();
-        size = 0;
-        numberOfDirs = 0;
-        numberOfFiles = 0;
+    }
+    
+    private void getProperties() {
+        if (!localListView.getSelectionModel().isEmpty()) {
+            Path p = getSelectedItemPath();
+            try {
+                String name = p.getFileName().toString();
+                String location = p.toString();
+                doFileOperation(p, null, OperationType.GET_SIZE);
+                StringBuilder byteSize = new StringBuilder(Long.toString(size));
+                for (int i = byteSize.length() - 3; i > 0 ; i -= 3) {
+                    byteSize.insert(i, ' ');
+                }
+                String sizeStr = Long.toString(size) + " bytes";
+                if(size >= 1073741824L) sizeStr = String.format("%.2f", (float)size/1073741824L) + " Gb (" + byteSize + " bytes)";
+                else if(size >= 1048576L) sizeStr = String.format("%.2f", (float)size/1048576L) + " Mb (" + byteSize + " bytes)";
+                else if(size >= 1024L) sizeStr = String.format("%.2f", (float)size/1024L) + " Kb (" + byteSize + " bytes)";
+                StringBuilder contentText = new StringBuilder();
+                contentText.append("Name: ").append(name).append("\n").append("Location: ").append(location).append("\n").append("Size: ").append(sizeStr);
+                if (Files.isDirectory(p)) {
+                    if (numberOfDirs < 0) numberOfDirs = 0;
+                    contentText.append("\n" + "Contains: ").append(numberOfFiles).append(" files, ").append(numberOfDirs).append(" folders");
+                }
+                propAlert.setContentText(contentText.toString());
+                propAlert.setTitle(name + " properties");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            propAlert.showAndWait();
+            size = 0;
+            numberOfDirs = 0;
+            numberOfFiles = 0;
+        }
     }
     
     private void updateListView(String path) {

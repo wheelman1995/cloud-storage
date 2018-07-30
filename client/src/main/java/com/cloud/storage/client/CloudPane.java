@@ -91,11 +91,11 @@ class CloudPane {
         filesNames = FXCollections.observableArrayList();
         filesSizes = new ArrayList<>();
         
-        MenuItem refresh = new MenuItem("Refresh");
-        MenuItem download = new MenuItem("Download");
-        MenuItem rename = new MenuItem("Rename");
-        MenuItem delete = new MenuItem("Delete");
-        MenuItem properties = new MenuItem("Properties");
+        MenuItem refresh = new MenuItem("Refresh (F5)");
+        MenuItem download = new MenuItem("Download (D)");
+        MenuItem rename = new MenuItem("Rename (F2)");
+        MenuItem delete = new MenuItem("Delete (Del)");
+        MenuItem properties = new MenuItem("Properties (Alt + Enter)");
     
         keyCombinationProps = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
         
@@ -184,6 +184,9 @@ class CloudPane {
                             cloudListView.getSelectionModel().selectLast();
                         }
                         break;
+                    case D:
+                        download();
+                        break;
                 }
             }
         });
@@ -221,26 +224,30 @@ class CloudPane {
     }
     
     private void generateProperties() {
-        int selectedFileIndex = cloudListView.getSelectionModel().getSelectedIndex();
-        String name = filesNames.get(selectedFileIndex);
-        long size = Long.parseLong(filesSizes.get(selectedFileIndex));
-        StringBuilder byteSize = new StringBuilder(filesSizes.get(selectedFileIndex));
-        for (int i = byteSize.length() - 3; i > 0 ; i -= 3) {
-            byteSize.insert(i, ' ');
-        }
-        String sizeStr = filesSizes.get(selectedFileIndex) + " bytes";
-        if(size >= 1073741824L) sizeStr = String.format("%.2f", (float)size/1073741824L) + " Gb (" + byteSize + " bytes)";
-        else if(size >= 1048576L) sizeStr = String.format("%.2f", (float)size/1048576L) + " Mb (" + byteSize + " bytes)";
-        else if(size >= 1024L) sizeStr = String.format("%.2f", (float)size/1024L) + " Kb (" + byteSize + " bytes)";
-        propAlert.setContentText("Name: " + name + "\n" + "Size: " + sizeStr);
-        propAlert.setTitle(name + " properties");
+        if (!cloudListView.getSelectionModel().isEmpty()) {
+            int selectedFileIndex = cloudListView.getSelectionModel().getSelectedIndex();
+            String name = filesNames.get(selectedFileIndex);
+            long size = Long.parseLong(filesSizes.get(selectedFileIndex));
+            StringBuilder byteSize = new StringBuilder(filesSizes.get(selectedFileIndex));
+            for (int i = byteSize.length() - 3; i > 0 ; i -= 3) {
+                byteSize.insert(i, ' ');
+            }
+            String sizeStr = filesSizes.get(selectedFileIndex) + " bytes";
+            if(size >= 1073741824L) sizeStr = String.format("%.2f", (float)size/1073741824L) + " Gb (" + byteSize + " bytes)";
+            else if(size >= 1048576L) sizeStr = String.format("%.2f", (float)size/1048576L) + " Mb (" + byteSize + " bytes)";
+            else if(size >= 1024L) sizeStr = String.format("%.2f", (float)size/1024L) + " Kb (" + byteSize + " bytes)";
+            propAlert.setContentText("Name: " + name + "\n" + "Size: " + sizeStr);
+            propAlert.setTitle(name + " properties");
         
-        propAlert.showAndWait();
+            propAlert.showAndWait();
+        }
     }
     
     private void download() {
-        String fileName = getSelectedItem();
-        dataHandler.write(new AbstractMessage(MessageType.DOWNLOAD, fileName));
+        if (!cloudListView.getSelectionModel().isEmpty()) {
+            String fileName = getSelectedItem();
+            dataHandler.write(new AbstractMessage(MessageType.DOWNLOAD, fileName));
+        }
     }
     
     void refresh() {
@@ -263,18 +270,22 @@ class CloudPane {
     }
     
     private void rename() {
-        String oldName = getSelectedItem();
-        renameDialog.getEditor().setText(oldName);
-        renameDialog.showAndWait();
-        if(renameDialog.getResult() != null) {
-            String newName = renameDialog.getResult();
-            dataHandler.write(new AbstractMessage(MessageType.RENAME, oldName, newName));
+        if (!cloudListView.getSelectionModel().isEmpty()) {
+            String oldName = getSelectedItem();
+            renameDialog.getEditor().setText(oldName);
+            renameDialog.showAndWait();
+            if(renameDialog.getResult() != null) {
+                String newName = renameDialog.getResult();
+                dataHandler.write(new AbstractMessage(MessageType.RENAME, oldName, newName));
+            }
         }
     }
     
     private void delete() {
-        String fileName = getSelectedItem();
-        dataHandler.write(new AbstractMessage(MessageType.DELETE, fileName));
+        if (!cloudListView.getSelectionModel().isEmpty()) {
+            String fileName = getSelectedItem();
+            dataHandler.write(new AbstractMessage(MessageType.DELETE, fileName));
+        }
     }
     
     void toggleView(boolean loginViewIsVisible) {
